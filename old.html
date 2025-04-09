@@ -246,12 +246,6 @@
             font-size: 14px;
             color: #7f8c8d;
         }
-        .progress-info {
-            text-align: center;
-            margin-top: 10px;
-            color: #3498db;
-            font-weight: bold;
-        }
         @media (max-width: 600px) {
             .game-options {
                 grid-template-columns: 1fr;
@@ -363,8 +357,6 @@
                     <div class="stat-label">Accuracy</div>
                 </div>
             </div>
-            
-            <div id="progress-info" class="progress-info"></div>
             
             <div class="controls">
                 <button id="back-to-menu" class="btn btn-gray">Back to Menu</button>
@@ -514,10 +506,6 @@
         let timerInterval = null;
         let timeRemaining = 0;
         let historyItems = [];
-        
-        // NEW: Track which airports have been shown
-        let remainingAirports = [];
-        let totalAirportsInSelection = 0;
 
         // DOM elements
         const menuScreen = document.getElementById('menu-screen');
@@ -548,7 +536,6 @@
         const accuracyElement = document.getElementById('accuracy');
         const answersHistory = document.getElementById('answers-history');
         const historyItemsElement = document.getElementById('history-items');
-        const progressInfoElement = document.getElementById('progress-info');
 
         // Initialize the app
         function init() {
@@ -597,43 +584,6 @@
             startReviewBtn.disabled = reviewList.length === 0;
         }
 
-        // NEW: Initialize the remaining airports based on region
-        function initializeRemainingAirports() {
-            // Filter airports based on selected region
-            let filteredData = airportData;
-            if (studyRegion !== 'All') {
-                filteredData = airportData.filter(airport => airport.region === studyRegion);
-            }
-            
-            // Create a fresh copy of the filtered airports
-            remainingAirports = [...filteredData];
-            totalAirportsInSelection = remainingAirports.length;
-            
-            // Shuffle the array to randomize the order
-            shuffleArray(remainingAirports);
-            
-            // Update the progress info
-            updateProgressInfo();
-        }
-
-        // NEW: Shuffle array using Fisher-Yates algorithm
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        // NEW: Update progress info
-        function updateProgressInfo() {
-            const remaining = remainingAirports.length;
-            const completed = totalAirportsInSelection - remaining;
-            const percentage = Math.round((completed / totalAirportsInSelection) * 100);
-            
-            progressInfoElement.textContent = `Progress: ${completed}/${totalAirportsInSelection} airports (${percentage}%)`;
-        }
-
         // Start the game
         function startGame(mode) {
             // Set game mode
@@ -647,11 +597,6 @@
             incorrectCount = 0;
             historyItems = [];
             updateHistory();
-            
-            // NEW: Initialize the remaining airports if not in review mode
-            if (!reviewMode) {
-                initializeRemainingAirports();
-            }
             
             // Update UI for the selected game mode
             if (mode === 'cityToCode') {
@@ -708,37 +653,23 @@
                     return nextQuestion();
                 }
             } else if (!reviewMode) {
-                // NEW: Check if we've gone through all airports
-                if (remainingAirports.length === 0) {
-                    gameFeedback.textContent = 'Congratulations! You have gone through all airports in this region. 🎉';
-                    gameFeedback.classList.add('correct');
-                    
-                    // Give the user some options
-                    const resetBtn = document.createElement('button');
-                    resetBtn.textContent = 'Restart with Same Region';
-                    resetBtn.className = 'btn btn-purple';
-                    resetBtn.style.margin = '10px auto';
-                    resetBtn.style.display = 'block';
-                    resetBtn.onclick = () => {
-                        initializeRemainingAirports();
-                        nextQuestion();
-                    };
-                    
-                    gameFeedback.appendChild(document.createElement('br'));
-                    gameFeedback.appendChild(resetBtn);
-                    
+                // Get a random airport based on region filter
+                let filteredData = airportData;
+                if (studyRegion !== 'All') {
+                    filteredData = airportData.filter(airport => airport.region === studyRegion);
+                }
+                
+                if (filteredData.length === 0) {
+                    gameFeedback.textContent = 'No airports found for the selected region.';
                     return;
                 }
                 
-                // NEW: Get the next airport from our remaining shuffled list
-                currentQuestion = remainingAirports.pop();
+                // Get a random airport
+                currentQuestion = filteredData[Math.floor(Math.random() * filteredData.length)];
                 
                 // Display the question
                 questionElement.textContent = currentQuestion.city;
                 regionInfoElement.textContent = `Region: ${currentQuestion.region}`;
-                
-                // Update progress info
-                updateProgressInfo();
             } else {
                 // If review mode but no review items left
                 gameFeedback.textContent = 'You have reviewed all missed items! 🎉';
@@ -884,10 +815,6 @@
                     });
                     updateReviewButton();
                 }
-                
-                // NEW: Put the skipped airport back into the pool if we're not in review mode
-                remainingAirports.unshift(currentQuestion);
-                updateProgressInfo();
             } else {
                 // Move to the end of the review list
                 const item = reviewList.shift();
@@ -961,10 +888,6 @@
                     });
                     updateReviewButton();
                 }
-                
-                // NEW: Put the timed-out airport back into the pool if we're not in review mode
-                remainingAirports.unshift(currentQuestion);
-                updateProgressInfo();
             }
             
             // Update question count and incorrect count
